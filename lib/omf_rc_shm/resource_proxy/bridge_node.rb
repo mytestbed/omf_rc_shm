@@ -7,7 +7,7 @@ module OmfRc::ResourceProxy::BridgeNode
   property :config_file
 
   request :cron_jobs do |node|
-    node.children.find_all { |v| v.type =~ /cron/ }.map do |v|
+    node.children.find_all { |v| v.type =~ /crontab/ }.map do |v|
       { name: v.hrn, type: v.type, uid: v.uid }
     end.sort { |x, y| x[:name] <=> y[:name] }
   end
@@ -17,7 +17,7 @@ module OmfRc::ResourceProxy::BridgeNode
 
     OmfRcShm.app.definitions.each do |d|
       info "Got definition #{d.inspect}"
-      #TODO create cron proxy based on these defitions
+      #TODO create crontab proxy based on these defitions
     end
   end
 end
