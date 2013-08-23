@@ -70,6 +70,10 @@
 #
 #     { :title => {:value => "My First Application"} }
 #
+
+require 'cronedit'
+require 'listen'
+
 module OmfRc::ResourceProxy::Crontab
   include OmfRc::ResourceProxyDSL
   # @!macro extend_dsl
@@ -105,6 +109,9 @@ module OmfRc::ResourceProxy::Crontab
   property :oml, :default => Hashie::Mash.new
   property :oml_logfile, :default => nil
   property :oml_loglevel, :default => nil
+  property :cron_schedule, :default => nil
+  
+  listener = nil
 
   # @!macro group_hook
   #
@@ -119,14 +126,11 @@ module OmfRc::ResourceProxy::Crontab
   # @!macro hook
   # @!method after_initial_configured
   hook :after_initial_configured do |res|
-    # if state was set to running or installing from the create we need
+    # if state was set to running from the create we need
     # to make sure that this happens!
     if res.property.state.to_s.downcase.to_sym == :running
       res.property.state = :stopped
       res.switch_to_running
-    elsif res.property.state.to_s.downcase.to_sym == :installing
-      res.property.state = :stopped
-      res.switch_to_installing
     end
   end
 
@@ -171,6 +175,9 @@ module OmfRc::ResourceProxy::Crontab
                       uid: res.uid
                     }, :ALL)
       end
+  end
+  
+  file_change_callback = Proc.new do |modified, added, removed|
   end
 
   # @!macro group_request
@@ -226,7 +233,7 @@ module OmfRc::ResourceProxy::Crontab
           # only set this new parameter if it passes the type check
           if res.pass_type_checking?(new_val)
             res.property.parameters[p] = new_val
-            res.dynamic_parameter_update(p,new_val)
+            #res.dynamic_parameter_update(p,new_val)
           else
             res.log_inform_error "Configuration of parameter '#{p}' failed "+
               "type checking. Defined type is #{new_val[:type]} while assigned "+
@@ -277,10 +284,8 @@ module OmfRc::ResourceProxy::Crontab
   configure :state do |res, value|
     OmfCommon.eventloop.after(0) do
       case value.to_s.downcase.to_sym
-      when :installing then res.switch_to_installing
       when :stopped then res.switch_to_stopped
       when :running then res.switch_to_running
-      when :paused then res.switch_to_paused
       else
         res.log_inform_warn "Cannot switch application to unknown state '#{value.to_s}'!"
       end
@@ -291,35 +296,6 @@ module OmfRc::ResourceProxy::Crontab
   # @!endgroup
 
   # @!macro group_work
-  #
-  # Swich this Application RP into the 'installing' state
-  # (see the description of configure :state)
-  # @!macro work
-  # @!method switch_to_installing
-  work('switch_to_installing') do |res|
-    if res.property.state.to_sym == :stopped
-      if res.property.installed
-        res.log_inform_warn "The application is already installed"
-      else
-        # Select the proper installation method based on the platform
-        # and the value of 'force_tarball_install'
-        res.property.state = :installing
-        if res.property.force_tarball_install ||
-          (res.property.platform == :unknown)
-          installing = res.install_tarball(res.property.pkg_tarball,
-              res.property.tarball_install_path)
-        elsif res.property.platform == :ubuntu
-          installing = res.install_ubuntu(res.property.pkg_ubuntu)
-        elsif res.property.platform == :fedora
-          installing = res.install_fedora(res.property.pkg_fedora)
-        end
-        res.property.state = :stopped unless installing
-      end
-    else
-      # cannot install as we are not stopped
-      res.log_inform_warn "Not in stopped state. Cannot switch to installing state!"
-    end
-  end
 
   # Switch this Application RP into the 'stopped' state
   # (see the description of configure :state)
@@ -327,27 +303,11 @@ module OmfRc::ResourceProxy::Crontab
   # @!macro work
   # @!method switch_to_stopped
   work('switch_to_stopped') do |res|
-    if res.property.state == :running || res.property.state == :paused
-      id = res.property.app_id
-      unless ExecApp[id].nil?
-        # stop this app
-        begin
-          # first, try sending 'exit' on the stdin of the app, and wait
-          # for 4s to see if the app acted on it...
-          ExecApp[id].stdin('exit')
-          sleep 4
-          unless ExecApp[id].nil?
-            # second, try sending TERM signal, wait another 4s to see
-            # if the app acted on it...
-            ExecApp[id].signal('TERM')
-            sleep 4
-            # finally, try sending KILL signal
-            ExecApp[id].kill('KILL') unless ExecApp[id].nil?
-          end
-          res.property.state = :completed
-        rescue => err
-        end
-      end
+    if res.property.state == :running
+      info "Removing cron job for #{res.property.app_id} with command #{res.build_command_line}"
+      CronEdit::Crontab.Remove res.property.app_id
+      #listener.stop
+      res.property.state = :stopped
     end
   end
 
@@ -363,56 +323,28 @@ module OmfRc::ResourceProxy::Crontab
       # we need at least a defined binary path to run an app...
       if res.property.binary_path.nil?
         res.log_inform_warn "Binary path not set! No Application to run!"
+      elsif res.property.cron_schedule.nil?
+        res.log_inform_warn "No cron schedule given!"
       else
-        ExecApp.new(res.property.app_id,
-                    res.build_command_line,
-                    res.property.map_err_to_out) do |event_type, app_id, msg|
-                      res.process_event(res, event_type, app_id, msg)
-                    end
+        info "Adding cron job for '#{res.property.app_id}' with schedule '#{res.property.cron_schedule}' and command '#{res.build_command_line}'"
+        CronEdit::Crontab.Add res.property.app_id, "#{res.property.cron_schedule} #{res.build_command_line} 2> /tmp/err.#{res.property.app_id}.log 1> /tmp/out.#{res.property.app_id}.log"
+#        ExecApp.new(res.property.app_id,
+#                    res.build_command_line,
+#                    res.property.map_err_to_out) do |event_type, app_id, msg|
+#                      res.process_event(res, event_type, app_id, msg)
+#                    end
+        listener = Listen.to('/tmp')
+              .filter(/\.log$/)
+              .latency(0.5)
+              .force_polling(true)
+              .polling_fallback_message('custom message')
+              .change(&file_change_callback)
+              .start
         res.property.state = :running
       end
-    elsif res.property.state == :paused
-      # resume this paused app
-      res.property.state = :running
-      # do more things here...
     else
       # cannot run as we are still installing or already completed
       res.log_inform_warn "Cannot switch to running state as current state is '#{res.property.state}'"
-    end
-  end
-
-  # Swich this Application RP into the 'paused' state
-  # (see the description of configure :state)
-  #
-  # @!macro work
-  # @!method switch_to_paused
-  work('switch_to_paused') do |res|
-    if res.property.state == :running
-      # pause this app
-      res.property.state = :paused
-      # do more things here...
-    end
-  end
-
-  # Check if a parameter is dynamic, and if so update its value if the
-  # application is currently running
-  #
-  # @yieldparam [String] name the parameter id as known by this app
-  # @yieldparam [Hash] att the Hash holding the parameter's attributs
-  # @see OmfRc::ResourceProxy::Application
-  #
-  # @!macro work
-  # @!method dynamic_parameter_update
-  work('dynamic_parameter_update') do |res,name,att|
-    # Only update a parameter if it is dynamic and the application is running
-    dynamic = false
-    dynamic = att[:dynamic] if res.boolean?(att[:dynamic])
-    if dynamic && res.property.state == :running
-      line = ""
-      line += "#{att[:cmd]} " unless att[:cmd].nil?
-      line += "#{att[:value]}"
-      ExecApp[res.property.app_id].stdin(line)
-      logger.info "Updated parameter '#{name}' with value '#{att[:value].inspect}' (stdin: '#{line}')"
     end
   end
 
@@ -587,6 +519,5 @@ module OmfRc::ResourceProxy::Crontab
     cmd += "--oml-log-file #{res.property.oml_logfile} " unless res.property.oml_logfile.nil?
     cmd
   end
-
 
 end
