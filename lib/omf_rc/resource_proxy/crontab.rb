@@ -110,8 +110,12 @@ module OmfRc::ResourceProxy::Crontab
   property :oml_logfile, :default => nil
   property :oml_loglevel, :default => nil
   property :cron_schedule, :default => nil
-  
-  listener = nil
+  property :timeout, :default => 0
+  property :timeout_kill_signal, :default => 'TERM'  
+  property :file_change_listener, :default => nil
+  property :file_change_callback, :default => nil
+  property :file_read_offset, :default => {}
+  property :app_log_dir, :default => '/tmp/omf_crontab'
 
   # @!macro group_hook
   #
@@ -177,9 +181,6 @@ module OmfRc::ResourceProxy::Crontab
       end
   end
   
-  file_change_callback = Proc.new do |modified, added, removed|
-  end
-
   # @!macro group_request
   #
   # Request the platform property of this Application RP
@@ -306,7 +307,7 @@ module OmfRc::ResourceProxy::Crontab
     if res.property.state == :running
       info "Removing cron job for #{res.property.app_id} with command #{res.build_command_line}"
       CronEdit::Crontab.Remove res.property.app_id
-      #listener.stop
+      res.property.file_change_listener.stop
       res.property.state = :stopped
     end
   end
@@ -326,20 +327,42 @@ module OmfRc::ResourceProxy::Crontab
       elsif res.property.cron_schedule.nil?
         res.log_inform_warn "No cron schedule given!"
       else
-        info "Adding cron job for '#{res.property.app_id}' with schedule '#{res.property.cron_schedule}' and command '#{res.build_command_line}'"
-        CronEdit::Crontab.Add res.property.app_id, "#{res.property.cron_schedule} #{res.build_command_line} 2> /tmp/err.#{res.property.app_id}.log 1> /tmp/out.#{res.property.app_id}.log"
+        Dir.mkdir(res.property.app_log_dir) if !Dir.exist?(res.property.app_log_dir)
+        stderr_file = "#{res.property.app_log_dir}/#{res.property.app_id}.err.log"
+        stdout_file = "#{res.property.app_log_dir}/#{res.property.app_id}.out.log"
+        File.delete(stderr_file) if File.exist?(stderr_file)
+        File.delete(stdout_file) if File.exist?(stdout_file)
+        cmd = "#{res.build_command_line} 2>>#{stderr_file} 1>>#{stdout_file}"
+        if res.property.timeout > 0
+          cmd = "timeout -s #{res.property.timeout_kill_signal} #{res.property.timeout} #{cmd}"
+        end
+        info "Adding cron job for '#{res.property.app_id}' with schedule '#{res.property.cron_schedule}' and command '#{cmd}'"
+        CronEdit::Crontab.Add res.property.app_id, "#{res.property.cron_schedule} #{cmd}"
 #        ExecApp.new(res.property.app_id,
 #                    res.build_command_line,
 #                    res.property.map_err_to_out) do |event_type, app_id, msg|
 #                      res.process_event(res, event_type, app_id, msg)
 #                    end
-        listener = Listen.to('/tmp')
-              .filter(/\.log$/)
-              .latency(0.5)
-              .force_polling(true)
-              .polling_fallback_message('custom message')
-              .change(&file_change_callback)
-              .start
+        res.property.file_change_callback = Proc.new do |modified, added, removed|
+          removed.each do |file|
+            res.property.file_read_offset[file]=nil
+          end
+          files = added + modified
+          files.each do |file|
+            if file.include? stderr_file or file.include? stdout_file
+              res.property.file_read_offset[file]=0 if res.property.file_read_offset[file].nil?
+              p res.property.file_read_offset[file]
+              data = IO.read(file,nil,res.property.file_read_offset[file])
+              res.property.file_read_offset[file]+=data.length
+              data.split(/\r?\n/).each do |line|
+                event_type = (file.include? ".err.log") ? "STDERR" : "STDOUT"
+                res.process_event(res, event_type, res.property.app_id, line)
+              end
+            end
+          end
+        end
+        res.property.file_change_listener = Listen.to(res.property.app_log_dir).change(&res.property.file_change_callback)
+        res.property.file_change_listener.start
         res.property.state = :running
       end
     else

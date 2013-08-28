@@ -19,10 +19,9 @@ def run_test(app)
   end
 
   # Configure the 'binary_path' and 'parameters' properties of the App Proxy
-  app.configure(binary_path: "/sbin/ping",
-                parameters: { :target => { :value => 'nicta.com.au' }},
+  app.configure(binary_path: "date",
                 oml_configfile: "/Users/cdw/tempo/omf_rc_shm/README.md",
-                use_oml: true,
+#                use_oml: true,
                 cron_schedule: "* * * * *")
 
   # Start the application 2 seconds later
@@ -31,7 +30,7 @@ def run_test(app)
   end
 
   # Stop the application another 10 seconds later
-  OmfCommon.eventloop.after 2 do
+  OmfCommon.eventloop.after 120 do
     app.configure(state: :stopped)
   end
 end
@@ -52,7 +51,7 @@ OmfCommon.init(:development, communication: { url: 'xmpp://norbit.npc.nicta.com.
 
     # Eventloop allows to control the flow, in this case, we disconnect after 5 seconds.
     #
-    OmfCommon.eventloop.after(10) { comm.disconnect }
+    OmfCommon.eventloop.after(300) { comm.disconnect }
     # If you hit ctrl-c, we will disconnect too.
     #
     comm.on_interrupted { comm.disconnect }
