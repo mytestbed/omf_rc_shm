@@ -21,12 +21,12 @@ Configure OmfRc to load SHM extension, simply modify '/etc/omf_rc/config.yml' to
     :resources:
     - :type: shm_node
       :uid: <%= Socket.gethostname %>
-      :config_file: <path_to_config_file>
+      :app_definition_file: <path_to_app_definition_file>
     :add_default_factories: false
     :factories:
     - :require: omf_rc_shm
 
-Where config file for shm_node simply defines the applications it runs using OEDL defApplication syntax.
+Where app_definition_file for shm_node simply defines the applications it runs using OEDL defApplication syntax.
 
 Example of defApplication:
 
@@ -46,7 +46,7 @@ Example of defApplication:
 
 ## Usage
 
-Start your computer
+OmfRc with SHM extension should start up automatically during boot.
 
 ## Contributing
 
