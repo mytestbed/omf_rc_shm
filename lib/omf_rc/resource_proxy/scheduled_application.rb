@@ -11,18 +11,11 @@
 # This Application Proxy has the following properties:
 #
 # - binary_path (String) the path to the binary of this app
-# - pkg_tarball (String) the URI of the installation tarball of this app
-# - pkg_ubuntu (String) the name of the Ubuntu package for this app
-# - pkg_fedora (String) the name of the Fedora package for this app
 # - state (String) the state of this Application RP
-#   (stopped, running, paused, installed, completed)
-# - installed (Boolean) is this application installed? (default false)
-# - force_tarball_install (Boolean) if true then force the installation
-#   from tarball even if other distribution-specific installation are
-#   available (default false)
+#   (unscheduled, scheduled)
 # - map_err_to_out (Boolean) if true then map StdErr to StdOut for this
 #   app (default false)
-# - platform (Symbol) the OS platform where this app is running
+# - platform (Symbol) the OS platform where this app is scheduled
 # - environment (Hash) the environment variables to set prior to starting
 #   this app. { k1 => v1, ... } will result in "env -i K1=v1 ... "
 #   (with k1 being either a String or a Symbol)
@@ -34,11 +27,11 @@
 #   following keys:
 #       - :available_mps (Array) list of available OML Measurement Points (Hash)
 #       - :collection (Hash) list of required OML Measurement Stream to collect
-#           when this application is running (defined in liboml2.conf manpage)
+#           when this application is scheduled (defined in liboml2.conf manpage)
 #           http://omf.mytestbed.net/doc/oml/html/liboml2.conf.html
 #       - :experiment (String) name of the experiment in which this application
-#           is running
-#       - :id (String) OML id to use for this application when it is running
+#           is scheduled
+#       - :id (String) OML id to use for this application when it is scheduled
 # - parameters (Hash) the command line parameters available for this app.
 #   This hash is of the form: { :param1 => attribut1, ... }
 #   with param1 being the id of this parameter for this Proxy and
@@ -74,13 +67,13 @@
 require 'cronedit'
 require 'listen'
 
-module OmfRc::ResourceProxy::Crontab
+module OmfRc::ResourceProxy::ScheduledApplication
   include OmfRc::ResourceProxyDSL
   # @!macro extend_dsl
 
   require 'omf_common/exec_app'
 
-  register_proxy :crontab
+  register_proxy :scheduled_application
   # @!parse include OmfRc::Util::PlatformTools
   # @!parse include OmfRc::Util::CommonTools
   utility :platform_tools
@@ -93,13 +86,7 @@ module OmfRc::ResourceProxy::Crontab
   property :description, :default => ''
   property :binary_path, :default => nil
   property :platform, :default => nil
-  property :pkg_tarball, :default => nil
-  property :tarball_install_path, :default => '/'
-  property :force_tarball_install, :default => false
-  property :pkg_ubuntu, :default => nil
-  property :pkg_fedora, :default => nil
-  property :state, :default => :stopped
-  property :installed, :default => false
+  property :state, :default => :unscheduled
   property :map_err_to_out, :default => false
   property :event_sequence, :default => 0
   property :parameters, :default => Hashie::Mash.new
@@ -109,13 +96,13 @@ module OmfRc::ResourceProxy::Crontab
   property :oml, :default => Hashie::Mash.new
   property :oml_logfile, :default => nil
   property :oml_loglevel, :default => nil
-  property :cron_schedule, :default => nil
+  property :schedule, :default => nil
   property :timeout, :default => 0
-  property :timeout_kill_signal, :default => 'TERM'  
+  property :timeout_kill_signal, :default => 'TERM'
   property :file_change_listener, :default => nil
   property :file_change_callback, :default => nil
   property :file_read_offset, :default => {}
-  property :app_log_dir, :default => '/tmp/omf_crontab'
+  property :app_log_dir, :default => '/tmp/omf_scheduled_app'
 
   # @!macro group_hook
   #
@@ -124,17 +111,17 @@ module OmfRc::ResourceProxy::Crontab
   # end
 
   hook :before_release do |app|
-    app.configure_state(:stopped)
+    app.configure_state(:unscheduled)
   end
 
   # @!macro hook
   # @!method after_initial_configured
   hook :after_initial_configured do |res|
-    # if state was set to running from the create we need
+    # if state was set to scheduled from the create we need
     # to make sure that this happens!
-    if res.property.state.to_s.downcase.to_sym == :running
-      res.property.state = :stopped
-      res.switch_to_running
+    if res.property.state.to_s.downcase.to_sym == :scheduled
+      res.property.state = :unscheduled
+      res.switch_to_scheduled
     end
   end
 
@@ -154,11 +141,8 @@ module OmfRc::ResourceProxy::Crontab
                   "(##{res.property.event_sequence}) - "+
                   "#{event_type}: '#{msg}'"
       res.property.event_sequence += 1
-      res.property.installed = true if app_id.include?("_INSTALL") &&
-                                       event_type.to_s.include?('EXIT') &&
-                                       msg == "0"
       if event_type == 'EXIT'
-        res.property.state = app_id.include?("_INSTALL") ? :stopped : :completed
+        res.property.state = :unscheduled
         res.inform(:status, {
                         status_type: 'APP_EVENT',
                         event: event_type.to_s.upcase,
@@ -180,7 +164,7 @@ module OmfRc::ResourceProxy::Crontab
                     }, :ALL)
       end
   end
-  
+
   # @!macro group_request
   #
   # Request the platform property of this Application RP
@@ -254,30 +238,23 @@ module OmfRc::ResourceProxy::Crontab
   end
 
   # Configure the state of this Application RP. The valid states are
-  # stopped, running, paused, installing. The semantic of each states are:
+  # unscheduled, scheduled, paused. The semantic of each states are:
   #
-  # - stopped: the initial state for an Application RP
+  # - unscheduled: the initial state for an Application RP
   # - completed: the final state for an application RP. When the application
   #   has been executed and its execution is finished, it enters this state.
   #   When the application is completed it cannot change state again
   #   TODO: maybe in future OMF, we could consider allowing an app to be reset?
-  # - running: upon entering in this state, a new instance of the application is
+  # - scheduled: upon entering in this state, a new instance of the application is
   #   started, the Application RP stays in this state until the
   #   application instance is finished or paused. The Application RP can
-  #   only enter this state from a previous paused or stopped state.
-  # - paused: upon entering this state, the currently running instance of this
+  #   only enter this state from a previous paused or unscheduled state.
+  # - paused: upon entering this state, the currently scheduled instance of this
   #   application should be paused (it is the responsibility of
   #   specialised Application Proxy to ensure that! This default
   #   Application Proxy does nothing to the application instance when
   #   entering this state). The Application RP can only enter this
-  #   state from a previous running state.
-  # - installing: upon entering in this state, a new installation of the
-  #   application will be performed by the Application RP, which will
-  #   stay in this state until the installation is done. The
-  #   Application RP can only enter this state from a previous stopped
-  #   state. Furthermore it can only exit this state to enter the stopped state
-  #   only when the installatio is done. Supported install methods are: Tarball,
-  #   Ubuntu, and Fedora
+  #   state from a previous scheduled state.
   #
   # @param [String] value the state to set this app into
   # @!macro configure
@@ -285,8 +262,8 @@ module OmfRc::ResourceProxy::Crontab
   configure :state do |res, value|
     OmfCommon.eventloop.after(0) do
       case value.to_s.downcase.to_sym
-      when :stopped then res.switch_to_stopped
-      when :running then res.switch_to_running
+      when :unscheduled then res.switch_to_unscheduled
+      when :scheduled then res.switch_to_scheduled
       else
         res.log_inform_warn "Cannot switch application to unknown state '#{value.to_s}'!"
       end
@@ -298,46 +275,46 @@ module OmfRc::ResourceProxy::Crontab
 
   # @!macro group_work
 
-  # Switch this Application RP into the 'stopped' state
+  # Switch this Application RP into the 'unscheduled' state
   # (see the description of configure :state)
   #
   # @!macro work
-  # @!method switch_to_stopped
-  work('switch_to_stopped') do |res|
-    if res.property.state == :running
+  # @!method switch_to_unscheduled
+  work('switch_to_unscheduled') do |res|
+    if res.property.state == :scheduled
       info "Removing cron job for #{res.property.app_id} with command #{res.build_command_line}"
       CronEdit::Crontab.Remove res.property.app_id
       res.property.file_change_listener.stop
-      res.property.state = :stopped
+      res.property.state = :unscheduled
     end
   end
 
-  # Switch this Application RP into the 'running' state
+  # Switch this Application RP into the 'scheduled' state
   # (see the description of configure :state)
   #
   # @!macro work
-  # @!method switch_to_running
-  work('switch_to_running') do |res|
-    if res.property.state == :stopped
+  # @!method switch_to_scheduled
+  work('switch_to_scheduled') do |res|
+    if res.property.state == :unscheduled
       # start a new instance of this app
       res.property.app_id = res.hrn.nil? ? res.uid : res.hrn
       # we need at least a defined binary path to run an app...
       if res.property.binary_path.nil?
         res.log_inform_warn "Binary path not set! No Application to run!"
-      elsif res.property.cron_schedule.nil?
-        res.log_inform_warn "No cron schedule given!"
+      elsif res.property.schedule.nil?
+        res.log_inform_warn "No schedule given!"
       else
         Dir.mkdir(res.property.app_log_dir) if !Dir.exist?(res.property.app_log_dir)
         stderr_file = "#{res.property.app_log_dir}/#{res.property.app_id}.err.log"
         stdout_file = "#{res.property.app_log_dir}/#{res.property.app_id}.out.log"
         File.delete(stderr_file) if File.exist?(stderr_file)
         File.delete(stdout_file) if File.exist?(stdout_file)
-        cmd = "#{res.build_command_line} 2>>#{stderr_file} 1>>#{stdout_file}"
+        cmd = "#{res.build_command_line} 2>>#{stderr_file} 1>>#{stdout_file} ; echo \"Application '#{res.property.app_id}' exited with code $? \" >>#{stderr_file}"
         if res.property.timeout > 0
           cmd = "timeout -s #{res.property.timeout_kill_signal} #{res.property.timeout} #{cmd}"
         end
-        info "Adding cron job for '#{res.property.app_id}' with schedule '#{res.property.cron_schedule}' and command '#{cmd}'"
-        CronEdit::Crontab.Add res.property.app_id, "#{res.property.cron_schedule} #{cmd}"
+        info "Adding cron job for '#{res.property.app_id}' with schedule '#{res.property.schedule}' and command '#{cmd}'"
+        CronEdit::Crontab.Add res.property.app_id, "#{res.property.schedule} #{cmd}"
 #        ExecApp.new(res.property.app_id,
 #                    res.build_command_line,
 #                    res.property.map_err_to_out) do |event_type, app_id, msg|
@@ -363,11 +340,10 @@ module OmfRc::ResourceProxy::Crontab
         end
         res.property.file_change_listener = Listen.to(res.property.app_log_dir).change(&res.property.file_change_callback)
         res.property.file_change_listener.start
-        res.property.state = :running
+        res.property.state = :scheduled
       end
     else
-      # cannot run as we are still installing or already completed
-      res.log_inform_warn "Cannot switch to running state as current state is '#{res.property.state}'"
+      res.log_inform_warn "Cannot switch to scheduled state as current state is '#{res.property.state}'"
     end
   end
 

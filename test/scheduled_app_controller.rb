@@ -8,8 +8,8 @@ require 'omf_rc_shm'
 #
 OmfCommon.init(:development, communication: { url: 'xmpp://norbit.npc.nicta.com.au' }) do
   OmfCommon.comm.on_connected do |comm|
-    info "Bridge controller >> Connected to XMPP server"
-    nridge = OmfRc::ResourceFactory.create(:crontab, uid: 'crontab')
-    comm.on_interrupted { bridge.disconnect }
+    info "Scheduled application controller >> Connected to XMPP server"
+    sched_app = OmfRc::ResourceFactory.create(:scheduled_application, uid: 'my_scheduled_app')
+    comm.on_interrupted { sched_app.disconnect }
   end
 end

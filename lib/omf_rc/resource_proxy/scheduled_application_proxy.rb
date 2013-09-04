@@ -1,13 +1,13 @@
-module OmfRc::ResourceProxy::BridgeNode
+module OmfRc::ResourceProxy::ScheduledApplication
   include OmfRc::ResourceProxyDSL
   # @!macro extend_dsl
 
-  register_proxy :bridge_node
+  register_proxy :scheduled_application
 
   property :app_definition_file
 
   request :cron_jobs do |node|
-    node.children.find_all { |v| v.type =~ /crontab/ }.map do |v|
+    node.children.find_all { |v| v.type =~ /scheduled_application/ }.map do |v|
       { name: v.hrn, type: v.type, uid: v.uid }
     end.sort { |x, y| x[:name] <=> y[:name] }
   end
@@ -18,7 +18,7 @@ module OmfRc::ResourceProxy::BridgeNode
     # TODO some of the naming will be changed
     OmfRcShm.app.definitions.each do |d|
       info "Got definition #{d.inspect}, now schedule them..."
-      s_app = OmfRc::ResourceFactory.create(:crontab, d)
+      s_app = OmfRc::ResourceFactory.create(:scheduled_application, d)
 
       OmfCommon.el.after(5) do
         s_app.configure(state: :scheduled)

@@ -21,4 +21,5 @@ Gem::Specification.new do |spec|
   spec.add_development_dependency "rake"
   spec.add_runtime_dependency "omf_rc", "~> 6.0.5"
   spec.add_runtime_dependency "cronedit"
+  spec.add_runtime_dependency "listener"
 end

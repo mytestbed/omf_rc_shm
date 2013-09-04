@@ -22,16 +22,16 @@ def run_test(app)
   app.configure(binary_path: "date",
                 oml_configfile: "/Users/cdw/tempo/omf_rc_shm/README.md",
 #                use_oml: true,
-                cron_schedule: "* * * * *")
+                schedule: "* * * * *")
 
   # Start the application 2 seconds later
   OmfCommon.eventloop.after 1 do
-    app.configure(state: :running)
+    app.configure(state: :scheduled)
   end
 
   # Stop the application another 10 seconds later
   OmfCommon.eventloop.after 120 do
-    app.configure(state: :stopped)
+    app.configure(state: :unscheduled)
   end
 end
 #
@@ -40,12 +40,12 @@ OmfCommon.init(:development, communication: { url: 'xmpp://norbit.npc.nicta.com.
   #
   OmfCommon.comm.on_connected do |comm|
     info "Connected to XMPP"
-    
-    comm.subscribe('crontab') do |bridge|
-      unless bridge.error?
-        run_test(bridge)
+
+    comm.subscribe('my_scheduled_app') do |sched_app|
+      unless sched_app.error?
+        run_test(sched_app)
       else
-        error bridge.inspect
+        error sched_app.inspect
       end
     end
 
