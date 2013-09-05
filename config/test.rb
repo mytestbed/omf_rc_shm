@@ -23,13 +23,15 @@ App.define(
         }
       ],
       collection: [
-        url: "tcp://0.0.0.0:3003",
-        streams: [
-          {
-            mp: "udp_in",
-            interval: 3
-          }
-        ]
+        {
+          url: "tcp:0.0.0.0:3003",
+          streams: [
+            {
+              mp: "udp_in",
+              interval: 3
+            }
+          ]
+        }
       ]
     }
   }
