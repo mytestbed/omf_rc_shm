@@ -1,8 +1,7 @@
-module OmfRc::ResourceProxy::ScheduledApplication
+module OmfRc::ResourceProxy::ShmNode
   include OmfRc::ResourceProxyDSL
-  # @!macro extend_dsl
 
-  register_proxy :scheduled_application
+  register_proxy :shm_node
 
   property :app_definition_file
 
@@ -15,7 +14,6 @@ module OmfRc::ResourceProxy::ScheduledApplication
   hook :after_initial_configured do |node|
     OmfRcShm.app.load_definition(node.request_app_definition_file)
 
-    # TODO some of the naming will be changed
     OmfRcShm.app.definitions.each do |d|
       info "Got definition #{d.inspect}, now schedule them..."
       s_app = OmfRc::ResourceFactory.create(:scheduled_application, d)
