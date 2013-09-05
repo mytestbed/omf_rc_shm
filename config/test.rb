@@ -1,5 +1,6 @@
 defApplication('otr2') do |a|
-  a.schedule = "* 18 * * *"
+  a.schedule = "* * * * *"
+  a.timeout = 20
   a.binary_path = "/usr/bin/otr2"
   a.description = <<TEXT
       otr is a configurable traffic sink. It contains port to receive
@@ -19,7 +20,8 @@ TEXT
 end
 
 defApplication('otg2') do |a|
-  a.schedule = "* 18 * * *"
+  a.schedule = "* * * * *"
+  a.timeout = 20
   a.binary_path = "/usr/bin/otg2"
   a.description = <<TEXT
       OTG is a configurable traffic generator. It contains generators

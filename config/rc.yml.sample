@@ -1,0 +1,16 @@
+# Use this with standard omf_rc
+---
+:uri: local://local
+:environment: development
+:debug: false
+
+:resources:
+- :type: shm_node
+  :uid: <%= Socket.gethostname %>
+    :app_definition_file: path_to_your_app_definition_file
+
+    :add_default_factories: false # Not loading default type factories
+
+    :factories: # Additional resources which can be created by this RC
+    - :require: omf_rc_shm
+

@@ -16,10 +16,11 @@ module OmfRc::ResourceProxy::ShmNode
 
     OmfRcShm.app.definitions.each do |d|
       info "Got definition #{d.inspect}, now schedule them..."
-      s_app = OmfRc::ResourceFactory.create(:scheduled_application, d)
-
+      app_id = d[0]
+      app_opts = d[1].properties.merge(hrn: app_id, use_oml: true)
+      s_app = OmfRc::ResourceFactory.create(:scheduled_application, app_opts)
       OmfCommon.el.after(5) do
-        s_app.configure(state: :scheduled)
+        s_app.configure_state(:scheduled)
       end
     end
   end
