@@ -26,23 +26,47 @@ Configure OmfRc to load SHM extension, simply modify '/etc/omf_rc/config.yml' to
     :factories:
     - :require: omf_rc_shm
 
-Where app_definition_file for shm_node simply defines the applications it runs using OEDL defApplication syntax.
+Where app_definition_file for shm_node simply defines the applications it runs
 
 Example of defApplication:
 
-    defApplication('otr2') do |a|
-      a.schedule = "* 18 * * *"
-      a.binary_path = "/usr/bin/otr2"
-      a.defProperty('udp_local_host', 'IP address of this Destination node', '--udp:local_host', { :type => :string, :dynamic => false })
-      a.defProperty('udp_local_port', 'Receiving Port of this Destination node', '--udp:local_port', { :type => :integer, :dynamic => false })
-      a.defMeasurement('udp_in') do |m|
-        m.defMetric('flow_id',:long)
-        m.defMetric('seq_no',:long)
-        m.defMetric('pkt_length',:long)
-        m.defMetric('dst_host',:string)
-        m.defMetric('dst_port',:long)
-      end
-    end
+    App.define(
+      "otr2", {
+        schedule: "* * * * *",
+        timeout: 20,
+        binary_path: "/usr/bin/otr2",
+        use_oml: true,
+        parameters: {
+          udp_local_host: { cmd: "--udp:local_host", value: "0.0.0.0" }
+        },
+        oml: {
+          experiment: "otr2_#{Time.now.to_i}",
+          id: "otr2",
+          available_mps: [
+            {
+              mp: "udp_in",
+              fields: [
+                { field: "flow_id", type: :long },
+                { field: "seq_no", type: :long },
+                { field: "pkt_length", type: :long },
+                { field: "dst_host", type: :string },
+                { field: "dst_port", type: :long }
+              ]
+            }
+          ],
+          collection: [
+            url: "tcp://0.0.0.0:3003",
+            streams: [
+              {
+                mp: "udp_in",
+                interval: 3
+              }
+            ]
+          ]
+        }
+      }
+    )
+
 
 ## Usage
 
