@@ -96,7 +96,7 @@ module OmfRc::ResourceProxy::ScheduledApplication
   property :oml, :default => Hashie::Mash.new
   property :oml_logfile, :default => nil
   property :oml_loglevel, :default => nil
-  property :schedule, :default => nil
+  property :schedule, :default => "now"
   property :timeout, :default => 0
   property :timeout_kill_signal, :default => 'TERM'
   property :file_change_listener, :default => nil
@@ -304,15 +304,32 @@ module OmfRc::ResourceProxy::ScheduledApplication
       elsif res.property.schedule.nil?
         res.log_inform_warn "No schedule given!"
       else
+        # "now" schedules job to run once, two minutes from now
+        if res.property.schedule == "now"
+          t = Time.now()+120
+          res.property.schedule = t.strftime("%-M %-H %-d %-m *")
+        end
         Dir.mkdir(res.property.app_log_dir) if !Dir.exist?(res.property.app_log_dir)
         stderr_file = "#{res.property.app_log_dir}/#{res.property.app_id}.err.log"
         stdout_file = "#{res.property.app_log_dir}/#{res.property.app_id}.out.log"
+        pid_file = "#{res.property.app_log_dir}/#{res.property.app_id}.pid.log"
         File.delete(stderr_file) if File.exist?(stderr_file)
         File.delete(stdout_file) if File.exist?(stdout_file)
-        cmd = "#{res.build_command_line} 2>>#{stderr_file} 1>>#{stdout_file} ; echo \"Application '#{res.property.app_id}' exited with code $? \" >>#{stderr_file}"
-        if res.property.timeout > 0
-          cmd = "timeout -s #{res.property.timeout_kill_signal} #{res.property.timeout} #{cmd}"
-        end
+        File.delete(pid_file) if File.exist?(pid_file)
+        #cmd = "#{res.build_command_line} 2>>#{stderr_file} 1>>#{stdout_file}; echo \"Application exited with code: $? \" >>#{stderr_file}"
+        cmd = "ruby -e 'pid = spawn(\"#{res.build_command_line}\", :out=>[\"#{stdout_file}\", \"a\"], :err=>[\"#{stderr_file}\", \"a\"])
+`echo \#{pid} >> #{pid_file}`
+fork {
+  sleep #{res.property.timeout}
+  Process.kill(\"#{res.property.timeout_kill_signal}\", pid)
+} if #{res.property.timeout} > 0
+Process.waitpid(pid)
+`echo Process \#{pid} exited with code: \#{$?.exitstatus} >> #{stderr_file}`'"
+        cmd.gsub!(/[\n]+/, ";");
+        # cmd = "#{res.build_command_line} 2>>#{stderr_file} 1>>#{stdout_file};"
+        # if res.property.timeout > 0
+        #   cmd = "timeout -s #{res.property.timeout_kill_signal} #{res.property.timeout} #{cmd}"
+        # end
         info "Adding cron job for '#{res.property.app_id}' with schedule '#{res.property.schedule}' and command '#{cmd}'"
         CronEdit::Crontab.Add res.property.app_id, "#{res.property.schedule} #{cmd}"
 #        ExecApp.new(res.property.app_id,
@@ -332,7 +349,17 @@ module OmfRc::ResourceProxy::ScheduledApplication
               data = IO.read(file,nil,res.property.file_read_offset[file])
               res.property.file_read_offset[file]+=data.length
               data.split(/\r?\n/).each do |line|
-                event_type = (file.include? ".err.log") ? "STDERR" : "STDOUT"
+                event_type = "STDOUT"
+                if file.include? ".err.log"
+                  event_type = "STDERR"
+                  if line.include? "exited with code:"
+                    if line.split(":").last.to_i == 0
+                      event_type = "DONE.OK"
+                    else
+                      event_type = "DONE.ERROR"
+                    end
+                  end
+                end
                 res.process_event(res, event_type, res.property.app_id, line)
               end
             end
