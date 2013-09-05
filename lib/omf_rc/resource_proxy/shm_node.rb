@@ -25,4 +25,9 @@ module OmfRc::ResourceProxy::ShmNode
       end
     end
   end
+
+  hook :before_ready do
+    system "crontab -r"
+  end
+
 end

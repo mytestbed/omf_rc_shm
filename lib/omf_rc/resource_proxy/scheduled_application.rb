@@ -96,7 +96,7 @@ module OmfRc::ResourceProxy::ScheduledApplication
   property :oml, :default => Hashie::Mash.new
   property :oml_logfile, :default => nil
   property :oml_loglevel, :default => nil
-  property :schedule, :default => "now"
+  property :schedule, :default => 'now'
   property :timeout, :default => 0
   property :timeout_kill_signal, :default => 'TERM'
   property :file_change_listener, :default => nil
@@ -282,8 +282,16 @@ module OmfRc::ResourceProxy::ScheduledApplication
   # @!method switch_to_unscheduled
   work('switch_to_unscheduled') do |res|
     if res.property.state == :scheduled
-      info "Removing cron job for #{res.property.app_id} with command #{res.build_command_line}"
+      info "Removing cron job for '#{res.property.app_id}'"
       CronEdit::Crontab.Remove res.property.app_id
+      pid_file = "#{res.property.app_log_dir}/#{res.property.app_id}.pid.log"
+      File.readlines(pid_file).each do |line|
+        begin
+          Process.kill(res.property.timeout_kill_signal, line.to_i)
+          info "Killing process #{line.to_i}"
+        rescue Errno::ESRCH
+        end
+      end
       res.property.file_change_listener.stop
       res.property.state = :unscheduled
     end
@@ -316,27 +324,18 @@ module OmfRc::ResourceProxy::ScheduledApplication
         File.delete(stderr_file) if File.exist?(stderr_file)
         File.delete(stdout_file) if File.exist?(stdout_file)
         File.delete(pid_file) if File.exist?(pid_file)
-        #cmd = "#{res.build_command_line} 2>>#{stderr_file} 1>>#{stdout_file}; echo \"Application exited with code: $? \" >>#{stderr_file}"
-        cmd = "ruby -e 'pid = spawn(\"#{res.build_command_line}\", :out=>[\"#{stdout_file}\", \"a\"], :err=>[\"#{stderr_file}\", \"a\"])
+        cmd = "ruby -e 'extend Process
+pid = spawn(\"#{res.build_command_line}\", :out=>[\"#{stdout_file}\", \"a\"], :err=>[\"#{stderr_file}\", \"a\"])
 `echo \#{pid} >> #{pid_file}`
 fork {
   sleep #{res.property.timeout}
-  Process.kill(\"#{res.property.timeout_kill_signal}\", pid)
+  kill(\"#{res.property.timeout_kill_signal}\", pid)
 } if #{res.property.timeout} > 0
-Process.waitpid(pid)
+waitpid(pid)
 `echo Process \#{pid} exited with code: \#{$?.exitstatus} >> #{stderr_file}`'"
-        cmd.gsub!(/[\n]+/, ";");
-        # cmd = "#{res.build_command_line} 2>>#{stderr_file} 1>>#{stdout_file};"
-        # if res.property.timeout > 0
-        #   cmd = "timeout -s #{res.property.timeout_kill_signal} #{res.property.timeout} #{cmd}"
-        # end
+        cmd.gsub!(/[\n]+/, ";") # make it a one-liner
         info "Adding cron job for '#{res.property.app_id}' with schedule '#{res.property.schedule}' and command '#{cmd}'"
         CronEdit::Crontab.Add res.property.app_id, "#{res.property.schedule} #{cmd}"
-#        ExecApp.new(res.property.app_id,
-#                    res.build_command_line,
-#                    res.property.map_err_to_out) do |event_type, app_id, msg|
-#                      res.process_event(res, event_type, app_id, msg)
-#                    end
         res.property.file_change_callback = Proc.new do |modified, added, removed|
           removed.each do |file|
             res.property.file_read_offset[file]=nil
@@ -345,7 +344,6 @@ Process.waitpid(pid)
           files.each do |file|
             if file.include? stderr_file or file.include? stdout_file
               res.property.file_read_offset[file]=0 if res.property.file_read_offset[file].nil?
-              p res.property.file_read_offset[file]
               data = IO.read(file,nil,res.property.file_read_offset[file])
               res.property.file_read_offset[file]+=data.length
               data.split(/\r?\n/).each do |line|

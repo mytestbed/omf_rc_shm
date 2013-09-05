@@ -20,10 +20,10 @@ def run_test(app)
 
   # Configure the 'binary_path' and 'parameters' properties of the App Proxy
   app.configure(binary_path: "sleep 5",
-                oml_configfile: "/Users/cdw/tempo/omf_rc_shm/README.md",
+#                oml_configfile: "/some/file",
                 timeout: 3,
 #                use_oml: true,
-                schedule: "now")
+                schedule: "* * * * *") # or use "now"
 
   # Start the application 2 seconds later
   OmfCommon.eventloop.after 1 do
@@ -31,7 +31,7 @@ def run_test(app)
   end
 
   # Stop the application another 10 seconds later
-  OmfCommon.eventloop.after 200 do
+  OmfCommon.eventloop.after 150 do
     app.configure(state: :unscheduled)
   end
 end
