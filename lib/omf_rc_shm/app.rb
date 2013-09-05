@@ -17,5 +17,9 @@ module OmfRcShm
     def load_definition(file_path)
       eval(File.read(file_path))
     end
+
+    def self.define(app_name, app_opts)
+      self.instance.definitions[app_name] = app_opts
+    end
   end
 end

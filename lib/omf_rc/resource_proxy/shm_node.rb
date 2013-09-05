@@ -4,6 +4,7 @@ module OmfRc::ResourceProxy::ShmNode
   register_proxy :shm_node
 
   property :app_definition_file
+  property :oml_uri
 
   request :cron_jobs do |node|
     node.children.find_all { |v| v.type =~ /scheduled_application/ }.map do |v|
@@ -14,10 +15,10 @@ module OmfRc::ResourceProxy::ShmNode
   hook :after_initial_configured do |node|
     OmfRcShm.app.load_definition(node.request_app_definition_file)
 
-    OmfRcShm.app.definitions.each do |d|
-      info "Got definition #{d.inspect}, now schedule them..."
-      app_id = d[0]
-      app_opts = d[1].properties.merge(hrn: app_id, use_oml: true)
+    OmfRcShm.app.definitions.each do |name, app_opts|
+      info "Got definition #{app_opts.inspect}, now schedule them..."
+      app_opts[:hrn] = name
+
       s_app = OmfRc::ResourceFactory.create(:scheduled_application, app_opts)
       OmfCommon.el.after(5) do
         s_app.configure_state(:scheduled)
