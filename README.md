@@ -26,9 +26,11 @@ Configure OmfRc to load SHM extension, simply modify '/etc/omf_rc/config.yml' to
     :factories:
     - :require: omf_rc_shm
 
-Where app_definition_file for shm_node simply defines the applications it runs
+## Define applications
 
-Example of defApplication:
+app_definition_file for shm_node simply defines the applications it runs.
+
+Example:
 
     App.define(
       "otr2", {
