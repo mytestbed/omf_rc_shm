@@ -324,16 +324,7 @@ module OmfRc::ResourceProxy::ScheduledApplication
         File.delete(stderr_file) if File.exist?(stderr_file)
         File.delete(stdout_file) if File.exist?(stdout_file)
         File.delete(pid_file) if File.exist?(pid_file)
-        cmd = "ruby -e 'extend Process
-pid = spawn(\"#{res.build_command_line}\", :out=>[\"#{stdout_file}\", \"a\"], :err=>[\"#{stderr_file}\", \"a\"])
-`echo \#{pid} >> #{pid_file}`
-fork {
-  sleep #{res.property.timeout}
-  kill(\"#{res.property.timeout_kill_signal}\", pid)
-} if #{res.property.timeout} > 0
-waitpid(pid)
-`echo Process \#{pid} exited with code: \#{$?.exitstatus} >> #{stderr_file}`'"
-        cmd.gsub!(/[\n]+/, ";") # make it a one-liner
+        cmd = "bin/cronjob_app_wrapper #{res.build_command_line} #{stdout_file} #{stderr_file} #{pid_file} #{res.property.timeout} #{res.property.timeout_kill_signal}"
         info "Adding cron job for '#{res.property.app_id}' with schedule '#{res.property.schedule}' and command '#{cmd}'"
         CronEdit::Crontab.Add res.property.app_id, "#{res.property.schedule} #{cmd}"
         res.property.file_change_callback = Proc.new do |modified, added, removed|
