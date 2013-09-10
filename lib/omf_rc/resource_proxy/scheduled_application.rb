@@ -82,6 +82,7 @@ module OmfRc::ResourceProxy::ScheduledApplication
   MAX_PARAMETER_NUMBER = 1000
   DEFAULT_MANDATORY_PARAMETER = false
 
+  property :ruby_path
   property :app_id, :default => nil
   property :description, :default => ''
   property :binary_path, :default => nil
