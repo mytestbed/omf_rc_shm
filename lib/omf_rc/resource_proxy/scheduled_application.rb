@@ -324,8 +324,13 @@ module OmfRc::ResourceProxy::ScheduledApplication
         File.delete(stderr_file) if File.exist?(stderr_file)
         File.delete(stdout_file) if File.exist?(stdout_file)
         File.delete(pid_file) if File.exist?(pid_file)
-        cmd = "bin/cronjob_app_wrapper #{res.build_command_line} #{stdout_file} #{stderr_file} #{pid_file} #{res.property.timeout} #{res.property.timeout_kill_signal}"
+
+        app_wrapper_path = File.expand_path("#{File.dirname(__FILE__)}/../../../bin/cronjob_app_wrapper")
+
+        cmd = "#{app_wrapper_path} #{res.build_command_line} #{stdout_file} #{stderr_file} #{pid_file} #{res.property.timeout} #{res.property.timeout_kill_signal}"
+
         info "Adding cron job for '#{res.property.app_id}' with schedule '#{res.property.schedule}' and command '#{cmd}'"
+
         CronEdit::Crontab.Add res.property.app_id, "#{res.property.schedule} #{cmd}"
         res.property.file_change_callback = Proc.new do |modified, added, removed|
           removed.each do |file|
@@ -422,7 +427,9 @@ module OmfRc::ResourceProxy::ScheduledApplication
   # @return [String] the full command line
   # @!macro work
   work('build_command_line') do |res|
-    cmd_line = "env -i " # Start with a 'clean' environment
+    # TODO is this necessary?
+    #cmd_line = "env -i " # Start with a 'clean' environment
+    cmd_line = ""
     res.property.environments.each do |e,v|
       val = v.kind_of?(String) ? "'#{v}'" : v
       cmd_line += "#{e.to_s.upcase}=#{val} "

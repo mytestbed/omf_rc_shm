@@ -1,39 +1,25 @@
-App.define(
-  "otr2", {
-    schedule: "* * * * *",
-    timeout: 20,
-    binary_path: "/usr/bin/otr2",
-    use_oml: true,
-    parameters: {
-      udp_local_host: { cmd: "--udp:local_host", value: "0.0.0.0" }
-    },
-    oml: {
-      experiment: "otr2_#{Time.now.to_i}",
-      id: "otr2",
-      available_mps: [
-        {
-          mp: "udp_in",
-          fields: [
-            { field: "flow_id", type: :long },
-            { field: "seq_no", type: :long },
-            { field: "pkt_length", type: :long },
-            { field: "dst_host", type: :string },
-            { field: "dst_port", type: :long }
-          ]
-        }
-      ],
-      collection: [
-        {
-          url: "tcp:0.0.0.0:3003",
-          streams: [
-            {
-              mp: "udp_in",
-              interval: 3
-            }
-          ]
-        }
-      ]
-    }
+defApplication("otr2") do |a|
+  a.schedule = "* * * * *"
+  a.timeout = 20
+  a.binary_path = "/usr/bin/otr2"
+  a.use_oml = true
+  a.parameters = {
+    udp_local_host: { cmd: "--udp:local_host", value: "0.0.0.0" }
   }
-)
+  a.oml = {
+    experiment: "otr2_#{Time.now.to_i}",
+    id: "otr2",
+    collection: [
+      {
+        url: "tcp:0.0.0.0:3003",
+        streams: [
+          {
+            mp: "udp_in",
+            interval: 3
+          }
+        ]
+      }
+    ]
+  }
+end
 

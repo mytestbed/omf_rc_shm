@@ -6,14 +6,14 @@ pid = Process.spawn(cmd, out: [stdout_f, "a"], err: [stderr_f, "a"])
 
 `echo #{pid} >> #{pid_f}`
 
-if timeout > 0
+if timeout && timeout.to_i > 0
   fork do
-    sleep timeout
+    sleep timeout.to_i
     Process.kill(kill_sig, pid)
   end
 end
 
-waitpid(pid)
+Process.waitpid(pid)
 
 `echo Process #{pid} exited with code: #{$?.exitstatus} >> #{stderr_f}`
 
