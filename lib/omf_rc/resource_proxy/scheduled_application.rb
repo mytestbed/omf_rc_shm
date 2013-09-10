@@ -328,6 +328,7 @@ module OmfRc::ResourceProxy::ScheduledApplication
         app_wrapper_path = File.expand_path("#{File.dirname(__FILE__)}/../../../bin/cronjob_app_wrapper")
 
         cmd = "#{app_wrapper_path} #{stdout_file} #{stderr_file} #{pid_file} #{res.property.timeout} #{res.property.timeout_kill_signal} #{res.build_command_line}"
+        cmd = "#{res.property.ruby_path} #{cmd}" if res.property.ruby_path
 
         info "Adding cron job for '#{res.property.app_id}' with schedule '#{res.property.schedule}' and command '#{cmd}'"
 

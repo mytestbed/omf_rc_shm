@@ -5,6 +5,7 @@ module OmfRc::ResourceProxy::ShmNode
 
   property :app_definition_file
   property :oml_uri
+  property :ruby_path
 
   request :cron_jobs do |node|
     node.children.find_all { |v| v.type =~ /scheduled_application/ }.map do |v|

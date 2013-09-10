@@ -7,10 +7,11 @@
 :resources:
 - :type: shm_node
   :uid: <%= Socket.gethostname %>
-    :app_definition_file: path_to_your_app_definition_file
+  :app_definition_file: path_to_your_app_definition_file
+  :ruby_path: <full_path_to_ruby>
 
-    :add_default_factories: false # Not loading default type factories
+:add_default_factories: false # Not loading default type factories
 
-    :factories: # Additional resources which can be created by this RC
-    - :require: omf_rc_shm
+:factories: # Additional resources which can be created by this RC
+- :require: omf_rc_shm
 

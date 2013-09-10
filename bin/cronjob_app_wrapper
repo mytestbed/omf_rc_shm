@@ -13,7 +13,10 @@ if timeout && timeout.to_i > 0
   end
 end
 
-Process.waitpid(pid)
+p_id, p_status = Process.waitpid2(pid)
 
-`echo Process #{pid} exited with code: #{$?.exitstatus} >> #{stderr_f}`
-
+if p_status.exitstatus
+  `echo Process #{p_id} #{cmd} exited with status: #{p_status.exitstatus} >> #{stderr_f}`
+elsif p_status.signaled?
+  `echo Process #{p_id} #{cmd} killed by signal: #{p_status.termsig} >> #{stderr_f}`
+end
