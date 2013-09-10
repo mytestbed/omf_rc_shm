@@ -1,8 +1,8 @@
 #!/usr/bin/env ruby
 
-cmd, stdout_f, stderr_f, pid_f, timeout, kill_sig = *ARGV
+stdout_f, stderr_f, pid_f, timeout, kill_sig, *cmd = *ARGV
 
-pid = Process.spawn(cmd, out: [stdout_f, "a"], err: [stderr_f, "a"])
+pid = Process.spawn(cmd.join(" "), out: [stdout_f, "a"], err: [stderr_f, "a"])
 
 `echo #{pid} >> #{pid_f}`
 
