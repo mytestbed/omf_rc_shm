@@ -9,6 +9,9 @@
   :uid: <%= ip = `ifconfig br0`.match(/inet addr:(\d*\.\d*\.\d*\.\d*)/)[1].split('.') ; 'node' + (ip[2].to_i*256+ip[3].to_i).to_s.rjust(4,'0') %>
   :app_definition_file: path_to_your_app_definition_file
   :ruby_path: <full_path_to_ruby>
+  # Uncomment :watchdog_timer line to start the watchdog time, set the top-up
+  # value in second (make sure to have it lower than timeout value)
+  #:watchdog_timer: 15
 
 :add_default_factories: false # Not loading default type factories
 

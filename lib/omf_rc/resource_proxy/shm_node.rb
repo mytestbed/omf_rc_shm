@@ -6,6 +6,7 @@ module OmfRc::ResourceProxy::ShmNode
   property :app_definition_file
   property :oml_uri
   property :ruby_path
+  property :watchdog_timer, :default => nil
 
   request :cron_jobs do |node|
     node.children.find_all { |v| v.type =~ /scheduled_application/ }.map do |v|
@@ -22,6 +23,13 @@ module OmfRc::ResourceProxy::ShmNode
       s_app = OmfRc::ResourceFactory.create(:scheduled_application, opts)
       OmfCommon.el.after(5) do
         s_app.configure_state(:scheduled)
+      end
+    end
+    # if required, start the watchdog timer and periodically top it
+    unless node.property.watchdog_timer.nil? 
+      info "Watchdog Timer started with interval: #{node.property.watchdog_timer}"
+      EventMachine.add_periodic_timer(node.property.watchdog_timer.to_i) do 
+        `echo "1" >/dev/watchdog`
       end
     end
   end
