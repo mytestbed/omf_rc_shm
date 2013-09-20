@@ -348,13 +348,14 @@ module OmfRc::ResourceProxy::ScheduledApplication
                 event_type = "STDOUT"
                 if file.include? ".err.log"
                   event_type = "STDERR"
-                  if line.include? "exited with code:"
+                  if line.include? "exited with status:"
                     if line.split(":").last.to_i == 0
                       event_type = "DONE.OK"
                     else
                       event_type = "DONE.ERROR"
                     end
                   end
+                  event_type = "DONE.OK" if line.include? "killed by signal:"
                 end
                 res.process_event(res, event_type, res.property.app_id, line)
               end
