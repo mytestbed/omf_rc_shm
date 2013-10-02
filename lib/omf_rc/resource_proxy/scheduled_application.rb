@@ -32,6 +32,7 @@
 #       - :experiment (String) name of the experiment in which this application
 #           is scheduled
 #       - :id (String) OML id to use for this application when it is scheduled
+#           if nil, then use this application's parent id
 # - parameters (Hash) the command line parameters available for this app.
 #   This hash is of the form: { :param1 => attribut1, ... }
 #   with param1 being the id of this parameter for this Proxy and
@@ -82,7 +83,6 @@ module OmfRc::ResourceProxy::ScheduledApplication
   MAX_PARAMETER_NUMBER = 1000
   DEFAULT_MANDATORY_PARAMETER = false
 
-  property :ruby_path
   property :app_id, :default => nil
   property :description, :default => ''
   property :binary_path, :default => nil
@@ -104,6 +104,8 @@ module OmfRc::ResourceProxy::ScheduledApplication
   property :file_change_callback, :default => nil
   property :file_read_offset, :default => {}
   property :app_log_dir, :default => '/tmp/omf_scheduled_app'
+  property :ruby_path
+  property :parent_id
 
   # @!macro group_hook
   #
@@ -510,7 +512,8 @@ module OmfRc::ResourceProxy::ScheduledApplication
       o = res.property.oml
       ofile = "/tmp/#{res.uid}-#{Time.now.to_i}.xml"
       of = File.open(ofile,'w')
-      of << "<omlc experiment='#{o.experiment}' id='#{o.id}'>\n"
+      oid = o.id.nil? ? res.property.parent_id : o.id
+      of << "<omlc experiment='#{o.experiment}' id='#{oid}'>\n"
       o.collection.each do |c|
         of << "  <collect url='#{c.url}'>\n"
         c.streams.each do |m|
