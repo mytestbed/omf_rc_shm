@@ -287,6 +287,7 @@ module OmfRc::ResourceProxy::ScheduledApplication
     if res.property.state == :scheduled
       info "Removing cron job for '#{res.property.app_id}'"
       CronEdit::Crontab.Remove res.property.app_id
+      restart_cron = `/etc/init.d/cron restart` # Vixie Cron on Angstrom requires restart!
       pid_file = "#{res.property.app_log_dir}/#{res.property.app_id}.pid.log"
       File.readlines(pid_file).each do |line|
         begin
@@ -321,9 +322,9 @@ module OmfRc::ResourceProxy::ScheduledApplication
           res.property.schedule = t.strftime("%-M %-H %-d %-m *")
         end
         Dir.mkdir(res.property.app_log_dir) if !Dir.exist?(res.property.app_log_dir)
-        stderr_file = "#{res.property.app_log_dir}/#{res.property.app_id}.err.log"
-        stdout_file = "#{res.property.app_log_dir}/#{res.property.app_id}.out.log"
-        pid_file = "#{res.property.app_log_dir}/#{res.property.app_id}.pid.log"
+        stderr_file = "#{res.property.app_log_dir}/#{res.property.app_id}.#{res.uid}.err.log"
+        stdout_file = "#{res.property.app_log_dir}/#{res.property.app_id}.#{res.uid}.out.log"
+        pid_file = "#{res.property.app_log_dir}/#{res.property.app_id}.#{res.uid}.pid.log"
         File.delete(stderr_file) if File.exist?(stderr_file)
         File.delete(stdout_file) if File.exist?(stdout_file)
         File.delete(pid_file) if File.exist?(pid_file)
@@ -336,6 +337,7 @@ module OmfRc::ResourceProxy::ScheduledApplication
         info "Adding cron job for '#{res.property.app_id}' with schedule '#{res.property.schedule}' and command '#{cmd}'"
 
         CronEdit::Crontab.Add res.property.app_id, "#{res.property.schedule} #{cmd}"
+        restart_cron = `/etc/init.d/cron restart` # Vixie Cron on Angstrom requires restart!
         res.property.file_change_callback = Proc.new do |modified, added, removed|
           removed.each do |file|
             res.property.file_read_offset[file]=nil
