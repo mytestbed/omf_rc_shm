@@ -1,0 +1,29 @@
+# Use this with standard omf_rc
+---
+# URI to the communication system
+# - local://local for no oustide communication
+# - xmpp://user:password@some.xmpp.server to use XMPP communication via 
+#   some.xmpp.server, using the specified user and password 
+:uri: local://local
+:environment: production
+:debug: false
+
+:resources:
+- :type: shm_node
+  # ID to give to this SHM node
+  # by default construct 'node1234' ID based on IP address of the br0 interface
+  # as requested by the SHM team
+  :uid: <%= ip = `ifconfig br0`.match(/inet addr:(\d*\.\d*\.\d*\.\d*)/)[1].split('.') ; 'node' + (ip[2].to_i*256+ip[3].to_i).to_s.rjust(4,'0') %>
+  # Path to the file with the default application schedule
+  :app_definition_file: /etc/omf_rc/scheduled_app.rb
+  # Path to find the Ruby binary
+  :ruby_path: /usr/local/bin/ruby
+  # The top-up value in second for the watchdog timer (must be lower than timeout value)
+  # Comment that line to disable the watchdog timer
+  :watchdog_timer: 15
+
+:add_default_factories: false # Not loading default type factories
+
+:factories: # Additional resources which can be created by this RC
+- :require: omf_rc_shm
+

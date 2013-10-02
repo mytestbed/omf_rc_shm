@@ -6,75 +6,86 @@ An extension to OmfRc provides support for structure health monitoring project
 
 Install it as:
 
-    $ gem install omf_rc_shm
+    $ gem install omf_rc_shm --no-ri --no-rdoc
+
+(if the above command returns that it cannot download data from https://rubygems.org, then try again with appending the addtional option `--source http://rubygems.org` and discard any subsequent SSL warning)
 
 Setup startup script
 
     $ install_omf_rc -c -i
 
-Configure OmfRc to load SHM extension, simply modify '/etc/omf_rc/config.yml' to something like this:
+This installs a generic OMF RC configuration file in `/etc/omf_rc/config.yml`, you should modify it following the [SHM-specific configuration example](config/config.yml):
 
     ---
-    :uri: xmpp://<%= "#{Socket.gethostname}-#{Process.pid}" %>:<%= "#{Socket.gethostname}-#{Process.pid}" %>@srv.mytestbed.net
+    :uri: local://local
     :environment: production
+    :debug: false
 
     :resources:
     - :type: shm_node
-      :uid: <%= Socket.gethostname %>
-      :app_definition_file: <path_to_app_definition_file>
+      :uid: <%= ip = `ifconfig br0`.match(/inet addr:(\d*\.\d*\.\d*\.\d*)/)[1].split('.') ; 'node' + (ip[2].to_i*256+ip[3].to_i).to_s.rjust(4,'0') %>
+      :app_definition_file: /etc/omf_rc/scheduled_app.rb
+      :ruby_path: /usr/local/bin/ruby
+      :watchdog_timer: 15
+
     :add_default_factories: false
     :factories:
     - :require: omf_rc_shm
 
+Where
+
+ * `:uri:` is the URI for the communication scheme to use, e.g. `local://local` (= no communication) or `xmpp://user:password@some.xmpp.server` (= use XMPP server at some.xmpp.server)
+ * `:uid:` is the ID given to this resource (e.g. the above example constructs an ID similar to 'node1234' based on the IP address of the 'br0' interface)
+ * `:app_definition_file:` is the path to the file with the default application schedule
+ * `:ruby_path:` where to find the ruby binary
+ * `:watchdog_timer:` number of second between each watchdog timer top-up (comment that parameter to disable the watchdog timer)
+
 ## Define applications
 
-app_definition_file for shm_node simply defines the applications it runs.
+The default schedule for the applications to run is in a file located at the path assigned to the above `:app_definition_file:` parameter. You should create such a file following the [default application schedule example](config/scheduled_app.rb):
 
 Example:
 
-    App.define(
-      "otr2", {
-        schedule: "* * * * *",
-        timeout: 20,
-        binary_path: "/usr/bin/otr2",
-        use_oml: true,
-        parameters: {
-          udp_local_host: { cmd: "--udp:local_host", value: "0.0.0.0" }
-        },
-        oml: {
-          experiment: "otr2_#{Time.now.to_i}",
-          id: "otr2",
-          available_mps: [
-            {
-              mp: "udp_in",
-              fields: [
-                { field: "flow_id", type: :long },
-                { field: "seq_no", type: :long },
-                { field: "pkt_length", type: :long },
-                { field: "dst_host", type: :string },
-                { field: "dst_port", type: :long }
-              ]
-            }
-          ],
-          collection: [
-            {
-              url: "tcp://0.0.0.0:3003",
-              streams: [
-                {
-                  mp: "udp_in",
-                  interval: 3
-                }
-              ]
-            }
-          ]
-        }
+    defApplication("my_app_name") do |a|
+      a.binary_path = "/usr/bin/my_app"
+      a.schedule = "*/5 * * * *"
+      a.timeout = 20
+      a.parameters = {
+        udp_target_host: { cmd: "--udp-target", value: "0.0.0.0", mandatory: true }
       }
-    )
+      a.use_oml = true
+      a.oml = {
+        experiment: "my_experiment_#{Time.now.to_i}",
+        id: "some_ID",
+        collection: [
+          {
+            url: "tcp:0.0.0.0:3003",
+            streams: [
+              {
+                mp: "udp_in", samples: 1
+              }
+            ]
+          }
+        ]
+      }
+    end
 
+Where
+
+ * `binary_path` is local path to the application's binary
+ * `schedule` is the definition of the schedule to run the application on. It can be either the string 'now' (= run this application as soon as possible) or a cron-type formatted schedule (see [crontab manual](http://www.google.com/search?q=man+crontab))
+ * `timeout` the time in second after which the application should be stopped, set to 0 to let the application stop by itself
+ * `parameters` the list of command line parameters that this application accepts, see the [OMF Documentation](https://github.com/mytestbed/omf/blob/master/doc/APPLICATION_PROXY.mkd#parameter-properties) for more detail
+ * `use_oml` enable OML instrumentation
+ * `oml` OML instrumentation parameters, see the [OML Config Documentation](http://omf.mytestbed.net/doc/oml/latest/liboml2.conf.5) for more detail. NOTE: if the sub-parameter `id:` is missing, the `:uid:` for this resource will be used by default, as requested by the SHM team.
+
+Additional definition for application to be schedule may be added following the above definition in the same file.
 
 ## Usage
 
 OmfRc with SHM extension should start up automatically during boot.
+
+However, if you need to start it manually you may use the command `omf_rc -c <path_to_config_file>`
 
 ## Contributing
 
