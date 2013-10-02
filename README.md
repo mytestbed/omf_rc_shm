@@ -1,6 +1,6 @@
 # OmfRcShm
 
-An extension to OmfRc provides support for structure health monitoring project
+An extension to the OMF RC, which provides support for the Structure Health Monitoring (SHM) project.
 
 ## Installation
 
@@ -8,7 +8,7 @@ Install it as:
 
     $ gem install omf_rc_shm --no-ri --no-rdoc
 
-(if the above command returns that it cannot download data from https://rubygems.org, then try again with appending the addtional option `--source http://rubygems.org` and discard any subsequent SSL warning)
+(if the above command returns that it cannot download data from https://rubygems.org, then try again with the additional option `--source http://rubygems.org` and discard any subsequent SSL warning)
 
 Setup startup script
 
@@ -83,7 +83,7 @@ Additional definition for application to be schedule may be added following the 
 
 ## Usage
 
-OmfRc with SHM extension should start up automatically during boot.
+The RC with SHM extension should start up automatically during boot.
 
 However, if you need to start it manually you may use the command `omf_rc -c <path_to_config_file>`
 
