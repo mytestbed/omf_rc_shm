@@ -23,7 +23,7 @@ def run_test(app)
 #                oml_configfile: "/some/file",
                 timeout: 3,
 #                use_oml: true,
-                schedule: "* * * * *") # or use "now"
+                schedule: "* * * * *") # or use "in 1"
 
   # Start the application 2 seconds later
   OmfCommon.eventloop.after 1 do

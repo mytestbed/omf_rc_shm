@@ -97,7 +97,7 @@ module OmfRc::ResourceProxy::ScheduledApplication
   property :oml, :default => Hashie::Mash.new
   property :oml_logfile, :default => nil
   property :oml_loglevel, :default => nil
-  property :schedule, :default => 'now'
+  property :schedule, :default => 'in 2'
   property :timeout, :default => 0
   property :timeout_kill_signal, :default => 'TERM'
   property :file_change_listener, :default => nil
@@ -287,7 +287,7 @@ module OmfRc::ResourceProxy::ScheduledApplication
     if res.property.state == :scheduled
       info "Removing cron job for '#{res.property.app_id}'"
       CronEdit::Crontab.Remove res.property.app_id
-      restart_cron = `/etc/init.d/cron restart` # Vixie Cron on Angstrom requires restart!
+      restart_cron = `/etc/init.d/cron restart &>/dev/null` # Vixie Cron on Angstrom requires restart!
       pid_file = "#{res.property.app_log_dir}/#{res.property.app_id}.pid.log"
       File.readlines(pid_file).each do |line|
         begin
@@ -316,9 +316,10 @@ module OmfRc::ResourceProxy::ScheduledApplication
       elsif res.property.schedule.nil?
         res.log_inform_warn "No schedule given!"
       else
-        # "now" schedules job to run once, two minutes from now
-        if res.property.schedule == "now"
-          t = Time.now()+120
+        # "in X" schedules job to run once, X minutes from now
+        if res.property.schedule[0,3] == "in "
+          delay = res.property.schedule.split(' ')[1].to_i * 60
+          t = Time.now() + delay
           res.property.schedule = t.strftime("%-M %-H %-d %-m *")
         end
         Dir.mkdir(res.property.app_log_dir) if !Dir.exist?(res.property.app_log_dir)
@@ -337,7 +338,7 @@ module OmfRc::ResourceProxy::ScheduledApplication
         info "Adding cron job for '#{res.property.app_id}' with schedule '#{res.property.schedule}' and command '#{cmd}'"
 
         CronEdit::Crontab.Add res.property.app_id, "#{res.property.schedule} #{cmd}"
-        restart_cron = `/etc/init.d/cron restart` # Vixie Cron on Angstrom requires restart!
+        restart_cron = `/etc/init.d/cron restart &>/dev/null` # Vixie Cron on Angstrom requires restart!
         res.property.file_change_callback = Proc.new do |modified, added, removed|
           removed.each do |file|
             res.property.file_read_offset[file]=nil

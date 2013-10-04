@@ -17,8 +17,9 @@ module OmfRc::ResourceProxy::ShmNode
   hook :after_initial_configured do |node|
     OmfRcShm.app.load_definition(node.request_app_definition_file)
 
+    info "Using app definition from '#{node.request_app_definition_file}'"
     OmfRcShm.app.definitions.each do |name, app_opts|
-      info "Got definition #{app_opts.inspect}, now schedule them..."
+      info "Got definition #{app_opts.inspect}, now schedule it..."
       opts = app_opts.properties.merge(hrn: name, ruby_path: node.property.ruby_path, parent_id: node.uid)
       s_app = OmfRc::ResourceFactory.create(:scheduled_application, opts)
       OmfCommon.el.after(5) do

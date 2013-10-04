@@ -51,7 +51,8 @@ Example:
       a.schedule = "*/5 * * * *"
       a.timeout = 20
       a.parameters = {
-        udp_target_host: { cmd: "--udp-target", value: "0.0.0.0", mandatory: true }
+        udp_target_host: { cmd: "--udp-target", value: "0.0.0.0", mandatory: true },
+        udp_target_port: { cmd: "--udp-port", value: 5000, mandatory: true }
       }
       a.use_oml = true
       a.oml = {
@@ -61,9 +62,8 @@ Example:
           {
             url: "tcp:0.0.0.0:3003",
             streams: [
-              {
-                mp: "udp_in", samples: 1
-              }
+              { mp: "udp_in", samples: 1 },
+              { mp: "udp_out", samples: 1 }
             ]
           }
         ]
@@ -73,7 +73,7 @@ Example:
 Where
 
  * `binary_path` is local path to the application's binary
- * `schedule` is the definition of the schedule to run the application on. It can be either the string 'now' (= run this application as soon as possible) or a cron-type formatted schedule (see [crontab manual](http://www.google.com/search?q=man+crontab))
+ * `schedule` is the definition of the schedule to run the application on. It can be either the string 'in X' which means that the application will be started X minutes after its definition has been processed; or a cron-type formatted schedule (see [crontab manual](http://www.google.com/search?q=man+crontab))
  * `timeout` the time in second after which the application should be stopped, set to 0 to let the application stop by itself
  * `parameters` the list of command line parameters that this application accepts, see the [OMF Documentation](https://github.com/mytestbed/omf/blob/master/doc/APPLICATION_PROXY.mkd#parameter-properties) for more detail
  * `use_oml` enable OML instrumentation

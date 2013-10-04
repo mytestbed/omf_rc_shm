@@ -3,7 +3,8 @@ defApplication("my_app_name") do |a|
   a.schedule = "*/5 * * * *"
   a.timeout = 20
   a.parameters = {
-    udp_target_host: { cmd: "--udp-target", value: "0.0.0.0", mandatory: true }
+    udp_target_host: { cmd: "--udp-target", value: "0.0.0.0", mandatory: true },
+    udp_target_port: { cmd: "--udp-port", value: 5000, mandatory: true }
   }
   a.use_oml = true
   a.oml = {
@@ -13,9 +14,8 @@ defApplication("my_app_name") do |a|
       {
         url: "tcp:0.0.0.0:3003",
         streams: [
-          {
-            mp: "udp_in", samples: 1
-          }
+          { mp: "udp_in", samples: 1 },
+          { mp: "udp_out", samples: 1 }
         ]
       }
     ]
