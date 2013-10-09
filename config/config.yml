@@ -13,7 +13,7 @@
   # ID to give to this SHM node
   # by default construct 'node1234' ID based on IP address of the br0 interface
   # as requested by the SHM team
-  :uid: <%= ip = `ifconfig br0`.match(/inet addr:(\d*\.\d*\.\d*\.\d*)/)[1].split('.') ; (ip[2].to_i*256+ip[3].to_i).to_s.rjust(5,'0') %>
+  :uid: '<%= ip = `ifconfig br0`.match(/inet addr:(\d*\.\d*\.\d*\.\d*)/)[1].split('.') ; (ip[2].to_i*256+ip[3].to_i).to_s.rjust(5,'0') %>'
   # Path to the file with the default application schedule
   :app_definition_file: /etc/omf_rc/scheduled_app.rb
   # Path to find the Ruby binary
