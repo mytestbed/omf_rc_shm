@@ -8,10 +8,13 @@ module OmfRcShm
     include OmfRcShm::App::DSL
 
     attr_accessor :definitions
+    attr_accessor :watchdog
+
 
     def initialize
       super
       @definitions ||= Hash.new
+      @watchdog = nil
     end
 
     def load_definition(file_path)

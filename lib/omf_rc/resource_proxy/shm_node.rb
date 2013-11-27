@@ -29,8 +29,10 @@ module OmfRc::ResourceProxy::ShmNode
     # if required, start the watchdog timer and periodically top it
     unless node.property.watchdog_timer.nil? 
       info "Watchdog Timer started with interval: #{node.property.watchdog_timer}"
+      OmfRcShm.app.watchdog = File.open('/dev/watchdog', 'w')
       EventMachine.add_periodic_timer(node.property.watchdog_timer.to_i) do 
-        `echo "1" >/dev/watchdog`
+        OmfRcShm.app.watchdog << "1"
+        OmfRcShm.app.watchdog.flush
       end
     end
   end
