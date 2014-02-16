@@ -15,15 +15,14 @@ module OmfRc::ResourceProxy::ShmNode
   end
 
   hook :after_initial_configured do |node|
-    OmfRcShm.app.load_definition(node.request_app_definition_file)
-
-    info "Using app definition from '#{node.request_app_definition_file}'"
-    OmfRcShm.app.definitions.each do |name, app_opts|
-      info "Got definition #{app_opts.inspect}, now schedule it..."
-      opts = app_opts.properties.merge(hrn: name, ruby_path: node.property.ruby_path, parent_id: node.uid)
-      s_app = OmfRc::ResourceFactory.create(:scheduled_application, opts)
-      OmfCommon.el.after(5) do
-        s_app.configure_state(:scheduled)
+    unless node.request_app_definition_file.nil?
+      OmfRcShm.app.load_definition(node.request_app_definition_file)
+      info "Using app definition from '#{node.request_app_definition_file}'"
+      OmfRcShm.app.definitions.each do |name, app_opts|
+        info "Got definition #{app_opts.inspect}, now schedule it..."
+        opts = app_opts.properties.merge(hrn: name, ruby_path: node.property.ruby_path, parent_id: node.uid)
+        s_app = OmfRc::ResourceFactory.create(:scheduled_application, opts)
+        OmfCommon.el.after(5) { s_app.configure_state(:scheduled) }
       end
     end
     # if required, start the watchdog timer and periodically top it
