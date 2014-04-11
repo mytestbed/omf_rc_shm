@@ -9,12 +9,14 @@ module OmfRcShm
 
     attr_accessor :definitions
     attr_accessor :watchdog
+    attr_accessor :default_groups
 
 
     def initialize
       super
       @definitions ||= Hash.new
       @watchdog = nil
+      @default_groups = []
     end
 
     def load_definition(file_path)

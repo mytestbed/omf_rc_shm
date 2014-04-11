@@ -288,13 +288,14 @@ module OmfRc::ResourceProxy::ScheduledApplication
       info "Removing cron job for '#{res.property.app_id}'"
       CronEdit::Crontab.Remove res.property.app_id
       restart_cron = `/etc/init.d/cron restart &>/dev/null` # Vixie Cron on Angstrom requires restart!
-      pid_file = "#{res.property.app_log_dir}/#{res.property.app_id}.pid.log"
-      File.readlines(pid_file).each do |line|
-        begin
+      pid_file = "#{res.property.app_log_dir}/#{res.property.app_id}.#{res.uid}.pid.log"
+      begin
+        File.readlines(pid_file).each do |line|
           Process.kill(res.property.timeout_kill_signal, line.to_i)
           info "Killing process #{line.to_i}"
-        rescue Errno::ESRCH
         end
+      rescue Exception => e
+        warn "Could not kill scheduled app #{res.property.app_id}.#{res.uid}"
       end
       res.property.file_change_listener.stop
       res.property.state = :unscheduled
@@ -320,7 +321,9 @@ module OmfRc::ResourceProxy::ScheduledApplication
         if res.property.schedule[0,3] == "in "
           delay = res.property.schedule.split(' ')[1].to_i * 60
           t = Time.now() + delay
-          res.property.schedule = t.strftime("%-M %-H %-d %-m *")
+          cron_schedule = t.strftime("%-M %-H %-d %-m *")
+        else
+          cron_schedule = res.property.schedule
         end
         Dir.mkdir(res.property.app_log_dir) if !Dir.exist?(res.property.app_log_dir)
         stderr_file = "#{res.property.app_log_dir}/#{res.property.app_id}.#{res.uid}.err.log"
@@ -335,9 +338,9 @@ module OmfRc::ResourceProxy::ScheduledApplication
         cmd = "#{app_wrapper_path} #{stdout_file} #{stderr_file} #{pid_file} #{res.property.timeout} #{res.property.timeout_kill_signal} #{res.build_command_line}"
         cmd = "#{res.property.ruby_path} #{cmd}" if res.property.ruby_path
 
-        info "Adding cron job for '#{res.property.app_id}' with schedule '#{res.property.schedule}' and command '#{cmd}'"
+        info "Adding cron job for '#{res.property.app_id}' with schedule '#{cron_schedule}' and command '#{cmd}'"
 
-        CronEdit::Crontab.Add res.property.app_id, "#{res.property.schedule} #{cmd}"
+        CronEdit::Crontab.Add res.property.app_id, "#{cron_schedule} #{cmd}"
         restart_cron = `/etc/init.d/cron restart &>/dev/null` # Vixie Cron on Angstrom requires restart!
         res.property.file_change_callback = Proc.new do |modified, added, removed|
           removed.each do |file|

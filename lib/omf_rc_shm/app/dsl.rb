@@ -8,6 +8,9 @@ class App
       info "Adding new definition #{name}"
       block.call(app_def) if block
     end
+    def defDefaultGroup(name)
+      OmfRcShm.app.default_groups << name
+    end
   end
 end
 end

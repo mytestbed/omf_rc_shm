@@ -19,7 +19,7 @@ Gem::Specification.new do |spec|
 
   spec.add_development_dependency "bundler", "~> 1.3"
   spec.add_development_dependency "rake"
-  spec.add_runtime_dependency "omf_rc", "~> 6.0.5"
+  spec.add_runtime_dependency "omf_rc" , "~> 6.1" 
   spec.add_runtime_dependency "json-jwt"
   spec.add_runtime_dependency "cronedit"
   spec.add_runtime_dependency "listen", "~> 1.3.1"
