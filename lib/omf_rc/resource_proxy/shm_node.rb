@@ -25,7 +25,8 @@ module OmfRc::ResourceProxy::ShmNode
 			info "Option 'time_sync_tries' is set. Continue only if local time is accurate, will try to sync #{node.property.time_sync_tries} times with random wait of up to #{node.property.time_sync_interval}s."
 			(1..node.property.time_sync_tries.to_i).each do |i|
         dt = node.property.time_sync_maxdrift.to_i
-        rt=0
+        lt = 0
+        rt = 0
         begin
           lt = Time.now ; rt = Net::NTP.get.time ; dt = (lt-rt).abs
         rescue Exception => e 
