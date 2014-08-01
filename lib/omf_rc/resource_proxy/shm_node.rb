@@ -20,12 +20,18 @@ module OmfRc::ResourceProxy::ShmNode
 
   hook :after_initial_configured do |node|
 		# 1) Do not continue unless we have some 'ok' time sync!
-		unless node.property.time_sync_tries.nil?
+    unless node.property.time_sync_tries.nil?
 			require 'net/ntp'
 			info "Option 'time_sync_tries' is set. Continue only if local time is accurate, will try to sync #{node.property.time_sync_tries} times with random wait of up to #{node.property.time_sync_interval}s."
 			(1..node.property.time_sync_tries.to_i).each do |i|
-				lt = Time.now ; rt = Net::NTP.get.time ; dt = (lt-rt).abs
-				if dt > node.property.time_sync_maxdrift.to_i
+        dt = node.property.time_sync_maxdrift.to_i
+        rt=0
+        begin
+          lt = Time.now ; rt = Net::NTP.get.time ; dt = (lt-rt).abs
+        rescue Exception => e 
+          info "Time sync try #{i} - Cannot contact NTP server (#{e})"
+        end
+        if dt > node.property.time_sync_maxdrift.to_i
   				info "Time sync try #{i} - Local: #{lt.to_i} - NTP: #{rt.to_i} - Diff: #{dt} - (sync: #{node.property.time_sync_cmd.to_s})"
           res = `#{node.property.time_sync_cmd.to_s}` 
 				else
