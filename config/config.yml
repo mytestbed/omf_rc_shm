@@ -2,8 +2,9 @@
 ---
 # URI to the communication system
 # - local://local for no oustide communication
+# - amqp://my.amqp.server.com to use AMQP communication
 # - xmpp://user:password@some.xmpp.server to use XMPP communication via 
-#   some.xmpp.server, using the specified user and password 
+#   some.xmpp.server, using the specified user and password
 :uri: local://local
 :environment: production
 :debug: false
@@ -13,7 +14,8 @@
   # ID to give to this SHM node
   # by default construct 'node1234' ID based on IP address of the br0 interface
   # as requested by the SHM team
-  :uid: '<%= ip = `ifconfig br0`.match(/inet addr:(\d*\.\d*\.\d*\.\d*)/)[1].split('.') ; (ip[2].to_i*256+ip[3].to_i).to_s.rjust(5,'0') %>'
+  #:uid: '<%= ip = `ifconfig br0`.match(/inet addr:(\d*\.\d*\.\d*\.\d*)/)[1].split('.') ; (ip[2].to_i*256+ip[3].to_i).to_s.rjust(5,'0') %>'
+  :uid: '<%= mac = `/sbin/ifconfig br0`.match(/HWaddr (\h*\:\h*\:\h*\:\h*:\h*:\h*)/)[1].split(':') ; (mac[4]+mac[5]).hex.to_s.rjust(5,'0') %>'
   # Path to the file with the default application schedule
   :app_definition_file: /etc/omf_rc/scheduled_app.rb
   # Path to find the Ruby binary
@@ -21,9 +23,20 @@
   # The top-up value in second for the watchdog timer (must be lower than timeout value)
   # Comment that line to disable the watchdog timer
   :watchdog_timer: 15
+  # Ensure local time is synced with NTP time before doing anything else.
+  # Local time is considered synced if it is within 'time_sync_maxdrift' second drift of NTP time.
+  # It will try 'time_sync_tries' times to do time sync using the command 'time_sync_cmd'.
+  # Each failed sync attempt will trigger a random sleep up to 'time_sync_interval' second before the next attempt.
+  :time_sync_tries: 20
+  :time_sync_maxdrift: 600
+  :time_sync_interval: 20
+  :time_sync_cmd: "/usr/bin/ntpdate -b -t 10 -u au.pool.ntp.org"
 
 :add_default_factories: false # Not loading default type factories
 
 :factories: # Additional resources which can be created by this RC
-- :require: omf_rc_shm
-
+  load: [
+    'omf_rc_shm',
+    'omf_rc/resource_proxy/scheduled_application',
+    'omf_rc/resource_proxy/application'
+  ]
