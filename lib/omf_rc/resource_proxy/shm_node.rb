@@ -23,28 +23,28 @@ module OmfRc::ResourceProxy::ShmNode
     unless node.property.time_sync_tries.nil?
 			require 'net/ntp'
 			info "Option 'time_sync_tries' is set. Continue only if local time is accurate, will try to sync #{node.property.time_sync_tries} times with random wait of up to #{node.property.time_sync_interval}s."
-			(1..node.property.time_sync_tries.to_i).each do |i|
-        dt = node.property.time_sync_maxdrift.to_i
-        lt = 0
-        rt = 0
+      dt = node.property.time_sync_maxdrift.to_i + 1
+      lt = rt = t = 0
+      while dt >node.property.time_sync_maxdrift.to_i do
+        t = t+1
         begin
           lt = Time.now ; rt = Net::NTP.get.time ; dt = (lt-rt).abs
-        rescue Exception => e 
+          if dt > node.property.time_sync_maxdrift.to_i
+            info "Time sync try #{t} - Local: #{lt.to_i} - NTP: #{rt.to_i} - Diff: #{dt} - (sync: #{node.property.time_sync_cmd.to_s})"
+            res = `#{node.property.time_sync_cmd.to_s}`
+            sleep(rand(node.property.time_sync_interval.to_i))
+          else
+            break
+          end
+        rescue Exception => e
           info "Time sync try #{i} - Cannot contact NTP server (#{e})"
+          sleep(rand(node.property.time_sync_interval.to_i))
         end
-        if dt > node.property.time_sync_maxdrift.to_i
-  				info "Time sync try #{i} - Local: #{lt.to_i} - NTP: #{rt.to_i} - Diff: #{dt} - (sync: #{node.property.time_sync_cmd.to_s})"
-          res = `#{node.property.time_sync_cmd.to_s}` 
-				else
-					break
-				end
-				sleep(rand(node.property.time_sync_interval.to_i))
-			end
-		  lt = Time.now ; rt = Net::NTP.get.time ; dt = (lt-rt).abs
-			if dt > node.property.time_sync_maxdrift.to_i
-				info "Time sync FAILED! EXITING NOW!"
-				exit
-			end
+        if t > node.property.time_sync_tries.to_i
+          info "Time sync FAILED! EXITING NOW!"
+          exit
+        end
+      end
   		info "Time sync OK - Local: #{lt.to_i} - NTP: #{rt.to_i} - Diff: #{dt}"
 		end
 		# 2) if present, load and set default app schedule
