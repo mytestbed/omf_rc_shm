@@ -37,7 +37,7 @@ module OmfRc::ResourceProxy::ShmNode
             break
           end
         rescue Exception => e
-          info "Time sync try #{i} - Cannot contact NTP server (#{e})"
+          info "Time sync try #{t} - Cannot contact NTP server (#{e})"
           sleep(rand(node.property.time_sync_interval.to_i))
         end
         if t > node.property.time_sync_tries.to_i
