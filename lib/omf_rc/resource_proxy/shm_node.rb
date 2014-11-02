@@ -7,10 +7,6 @@ module OmfRc::ResourceProxy::ShmNode
   property :oml_uri
   property :ruby_path
   property :watchdog_timer, :default => nil
-  property :time_sync_tries, :default => nil
-  property :time_sync_maxdrift, :default => 600
-  property :time_sync_interval, :default => 20
-  property :time_sync_cmd, :default => "/usr/bin/ntpdate -b -t 10 -u au.pool.ntp.org"
 
   request :cron_jobs do |node|
     node.children.find_all { |v| v.type =~ /scheduled_application/ }.map do |v|
@@ -19,35 +15,7 @@ module OmfRc::ResourceProxy::ShmNode
   end
 
   hook :after_initial_configured do |node|
-		# 1) Do not continue unless we have some 'ok' time sync!
-    unless node.property.time_sync_tries.nil?
-			require 'net/ntp'
-			info "Option 'time_sync_tries' is set. Continue only if local time is accurate, will try to sync #{node.property.time_sync_tries} times with random wait of up to #{node.property.time_sync_interval}s."
-      dt = node.property.time_sync_maxdrift.to_i + 1
-      lt = rt = t = 0
-      while dt >node.property.time_sync_maxdrift.to_i do
-        t = t+1
-        begin
-          lt = Time.now ; rt = Net::NTP.get.time ; dt = (lt-rt).abs
-          if dt > node.property.time_sync_maxdrift.to_i
-            info "Time sync try #{t} - Local: #{lt.to_i} - NTP: #{rt.to_i} - Diff: #{dt} - (sync: #{node.property.time_sync_cmd.to_s})"
-            res = `#{node.property.time_sync_cmd.to_s}`
-            sleep(rand(node.property.time_sync_interval.to_i))
-          else
-            break
-          end
-        rescue Exception => e
-          info "Time sync try #{t} - Cannot contact NTP server (#{e})"
-          sleep(rand(node.property.time_sync_interval.to_i))
-        end
-        if t > node.property.time_sync_tries.to_i
-          info "Time sync FAILED! EXITING NOW!"
-          exit
-        end
-      end
-  		info "Time sync OK - Local: #{lt.to_i} - NTP: #{rt.to_i} - Diff: #{dt}"
-		end
-		# 2) if present, load and set default app schedule
+		# 1) if present, load and set default app schedule
     unless node.request_app_definition_file.nil?
       OmfRcShm.app.load_definition(node.request_app_definition_file)
       info "Loaded scheduled app definition from '#{node.request_app_definition_file}'"
@@ -60,7 +28,7 @@ module OmfRc::ResourceProxy::ShmNode
         OmfCommon.el.after(5) { s_app.configure_state(:scheduled) }
       end
     end
-    # 3) if required, start the watchdog timer and periodically top it
+    # 2) if required, start the watchdog timer and periodically top it
     unless node.property.watchdog_timer.nil? 
       info "Watchdog Timer started with interval: #{node.property.watchdog_timer}"
       OmfRcShm.app.watchdog = File.open('/dev/watchdog', 'w')
@@ -69,7 +37,7 @@ module OmfRc::ResourceProxy::ShmNode
         OmfRcShm.app.watchdog.flush
       end
     end
-		# 4) Finally display our SHM Node ID:
+		# 3) Finally display our SHM Node ID:
 		info "SHM Node ID: #{node.uid}"
   end
 
