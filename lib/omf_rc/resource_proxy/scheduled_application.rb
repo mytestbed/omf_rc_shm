@@ -106,6 +106,7 @@ module OmfRc::ResourceProxy::ScheduledApplication
   property :app_log_dir, :default => '/tmp/omf_scheduled_app'
   property :ruby_path
   property :parent_id
+  property :instrument_launch, :default => Hashie::Mash.new(domain: 'null', url: 'file:/dev/null')
 
   # @!macro group_hook
   #
@@ -335,7 +336,8 @@ module OmfRc::ResourceProxy::ScheduledApplication
 
         app_wrapper_path = File.expand_path("#{File.dirname(__FILE__)}/../../../bin/cronjob_app_wrapper")
 
-        cmd = "#{app_wrapper_path} #{stdout_file} #{stderr_file} #{pid_file} #{res.property.timeout} #{res.property.timeout_kill_signal} #{res.build_command_line}"
+        cmd = "#{app_wrapper_path} #{res.property.instrument_launch.domain} #{res.property.instrument_launch.url}"
+        cmd = "#{cmd} #{stdout_file} #{stderr_file} #{pid_file} #{res.property.timeout} #{res.property.timeout_kill_signal} #{res.build_command_line}"
         cmd = "#{res.property.ruby_path} #{cmd}" if res.property.ruby_path
 
         info "Adding cron job for '#{res.property.app_id}' with schedule '#{cron_schedule}' and command '#{cmd}'"

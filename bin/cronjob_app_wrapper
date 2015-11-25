@@ -1,6 +1,26 @@
 #!/usr/bin/env ruby
 
-stdout_f, stderr_f, pid_f, timeout, kill_sig, *cmd = *ARGV
+require 'oml4r'
+
+# Get the Mac address and node ID
+ifconfig = '/sbin/ifconfig br0'
+mac_address = `#{ifconfig}`.match(/HWaddr (\h*\:\h*\:\h*\:\h*:\h*:\h*)/)[1]
+node_id = (mac_address.split(':')[4]+mac_address.split(':')[5]).hex.to_s.rjust(5,'0')
+
+odomain, ocollect, stdout_f, stderr_f, pid_f, timeout, kill_sig, *cmd = *ARGV
+
+# Record into OML
+class InfoMP < OML4R::MPBase
+  name  :app_info
+  param :app_path
+  param :app_start, :type => :double
+  param :app_duration, :type => :double
+  param :app_param
+end
+opts = {:domain => odomain, :collect => ocollect, :appName => 'cronwrap', :nodeID => node_id}
+OML4R::init(nil, opts)
+InfoMP.inject(cmd[0], Time.now.to_i, timeout.to_i, cmd.drop(1).join(' '))
+OML4R::close()
 
 pid = Process.spawn(cmd.join(" "), out: [stdout_f, "a"], err: [stderr_f, "a"])
 

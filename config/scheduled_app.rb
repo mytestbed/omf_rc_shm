@@ -20,4 +20,8 @@ defApplication("my_app_name") do |a|
       }
     ]
   }
+  a.instrument_launch = {
+    domain: "my_experiment_metadata",
+    url: "file:/tmp/foo.oml"
+  }
 end
